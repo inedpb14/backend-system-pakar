@@ -1,6 +1,7 @@
 // backend/src/controllers/userController.js
 
 import User from "../models/user.js";
+import { validationResult } from "express-validator"; // Untuk validasi input
 import generateToken from "../utils/generateToken.js"; // <-- perhatikan .js
 
 // @desc    Login user & get token
@@ -31,10 +32,15 @@ const loginUser = async (req, res) => {
 // @access  Public (atau bisa diubah ke Private/Admin jika hanya admin yang boleh mendaftar)
 const registerUser = async (req, res) => {
   const { username, password, role, kelas } = req.body;
+  // Periksa hasil validasi
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
   try {
     const userExists = await User.findOne({ username });
     if (userExists) {
-      return res.status(400).json({ message: 'Username sudah terdaftar' });
+      return res.status(400).json({ message: "Username sudah terdaftar" });
     }
     const user = await User.create({ username, password, role, kelas });
     res.status(201).json({
@@ -45,7 +51,9 @@ const registerUser = async (req, res) => {
       token: generateToken(res, user._id),
     });
   } catch (error) {
-    res.status(400).json({ message: 'Data pengguna tidak valid', error: error.message });
+    res
+      .status(400)
+      .json({ message: "Data pengguna tidak valid", error: error.message });
   }
 };
 

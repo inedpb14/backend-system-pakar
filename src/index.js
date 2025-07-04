@@ -3,6 +3,9 @@
 import express from "express";
 import connectDB from "./config/db.js";
 import cors from "cors";
+import helmet from "helmet";
+
+// rotes api
 import userRoutes from "./routes/userRoutes.js";
 import kategoriRoutes from "./routes/kategoriRoutes.js";
 import gejalaRoutes from "./routes/gejalaRoutes.js"; 
@@ -14,6 +17,7 @@ import kelasRoutes from "./routes/kelasRoutes.js";
 
 const PORT = process.env.PORT || 5001; // Menambahkan port default untuk keamanan
 const app = express();
+app.use(helmet()); // Menambahkan helmet untuk keamanan
 
 // Panggil fungsi koneksi database
 connectDB();
