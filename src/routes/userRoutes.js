@@ -8,9 +8,12 @@ import {
   getUserById,
   updateUser,
   deleteUser,
+  validateLogin, // Import validation rules
+  validateRegister, // Import validation rules
+  validateUpdateUser, // Import validation rules
 } from "../controllers/userController.js";
 import rateLimit from "express-rate-limit";
-import { body } from "express-validator"; // Untuk validasi input
+// import { body } from "express-validator"; // No longer needed here, imported from controller
 import { protect, admin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -26,16 +29,18 @@ const loginLimiter = rateLimit({
 
 
 // Rute Publik
-router.post("/login", loginUser, loginLimiter);
+// Apply login validation middleware
+router.post("/login", validateLogin, loginUser, loginLimiter);
+
+// Rute Register User
+// Saat ini rute ini bersifat publik.
+// Jika ingin membatasi hanya untuk admin, tambahkan middleware 'protect' dan 'admin' di sini:
+// router.post("/register", protect, admin, validateRegister, registerUser);
+// Jika tetap publik, pastikan validasi sudah cukup.
 router.post(
   "/register",
-  // Aturan validasi
-  body("username", "Username minimal 4 karakter")
-    .isLength({ min: 4 })
-    .trim()
-    .escape(),
-  body("password", "Password minimal 6 karakter").isLength({ min: 6 }),
-  body("role").optional().isIn(["admin", "siswa"]),
+  // Aturan validasi diimpor dari controller
+  validateRegister,
   registerUser
 );
 
@@ -45,7 +50,8 @@ router.get("/siswa", protect, admin, getAllSiswa); // Rute baru untuk mendapatka
 router
   .route("/:id")
   .get(protect, admin, getUserById)
-  .put(protect, admin, updateUser)
+  // Apply update user validation middleware
+  .put(protect, admin, validateUpdateUser, updateUser)
   .delete(protect, admin, deleteUser);
 
 export default router;

@@ -7,22 +7,24 @@ import {
   getKelasById,
   updateKelas,
   deleteKelas,
+  validateKelas, // Import validation rules
 } from "../controllers/kelasController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Rute untuk collection (/api/kelas)
+// Rute untuk Admin
 router
   .route("/")
-  .get(getAllKelas) // GET untuk semua kelas bisa diakses publik
-  .post(protect, admin, createKelas); // POST hanya untuk admin
+  .post(protect, admin, validateKelas, createKelas); // Apply validation middleware
 
-// Rute untuk item tunggal (/api/kelas/:id)
 router
   .route("/:id")
-  .get(getKelasById) // GET satu kelas bisa diakses publik
-  .put(protect, admin, updateKelas) // PUT hanya untuk admin
-  .delete(protect, admin, deleteKelas); // DELETE hanya untuk admin
+  .get(getKelasById) // Public access might be okay
+  .put(protect, admin, validateKelas, updateKelas) // Apply validation middleware
+  .delete(protect, admin, deleteKelas); // Delete check handled in controller
+
+// Rute Publik (biasanya getAll bisa diakses publik)
+router.route("/").get(getAllKelas); // This should be placed after the POST route for '/'
 
 export default router;

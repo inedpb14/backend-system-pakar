@@ -15,7 +15,8 @@ import konsultasiRoutes from "./routes/konsultasiRoutes.js";
 import kelasRoutes from "./routes/kelasRoutes.js"; 
 
 
-const PORT = process.env.PORT || 5001; // Menambahkan port default untuk keamanan
+const PORT = process.env.PORT || 5001; 
+
 const app = express();
 app.use(helmet()); // Menambahkan helmet untuk keamanan
 
@@ -24,6 +25,13 @@ connectDB();
 
 // Middleware
 app.use(cors());
+// // Konfigurasi CORS
+// const corsOptions = {
+//   origin: 'https://URL_FRONTEND_ANDA.vercel.app', // Ganti dengan URL Vercel frontend Anda nanti
+//   optionsSuccessStatus: 200
+// };
+// app.use(cors(corsOptions));
+
 app.use(express.json());
 
 // Routes
@@ -46,4 +54,4 @@ app.listen(PORT, () => {
   console.log(`Server berjalan di http://localhost:${PORT}`);
 });
 
-// 3. Perbaikan: Kurung kurawal penutup tambahan telah dihapus dari sini
+export default app;
