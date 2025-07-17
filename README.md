@@ -26,31 +26,35 @@ Mengelola data pengguna, registrasi, dan login.
 * **Deskripsi**: Mendaftarkan pengguna baru (bisa oleh admin atau untuk umum).  
 * **Akses**: Publik / Admin  
 * **Body**:  
+  ``` kode program
   {  
     "namaLengkap": "Budi Pengguna",  
     "email": "budi@example.com",  
     "password": "password123",  
     "role": "pengguna"  
   }
-
+  ```
 * **Respons Sukses (201 Created)**:  
+  ``` kode program
   {  
-    "\_id": "60d5f4c5c5f4b2a9d8f3e8a1",  
+    "_id": "60d5f4c5c5f4b2a9d8f3e8a1",  
     "namaLengkap": "Budi Pengguna",  
     "email": "budi@example.com",  
     "role": "pengguna"  
   }
+  ```
 
 ### **POST /users/login**
 
 * **Deskripsi**: Melakukan login untuk mendapatkan token.  
 * **Akses**: Publik  
 * **Body**:  
+  ``` kode program
   {  
     "email": "admin@example.com",  
     "password": "passwordadmin123"  
   }
-
+  ```
 * **Respons Sukses (200 OK)**: Mengembalikan data pengguna dan mengatur *cookie* token.
 
 ## **2\. Modul: Kategori**
@@ -62,12 +66,13 @@ Mengelola kategori hirarkis (induk-anak).
 * **Deskripsi**: Membuat kategori baru. Untuk membuat kategori anak, sertakan *field* parent dengan \_id dari kategori induk.  
 * **Akses**: Admin  
 * **Body**:  
+  ``` kode program
   {  
-    "nama\_kategori": "Kelas 4",  
+    "nama_kategori": "Kelas 4",  
     "deskripsi": "Untuk siswa kelas 4 SD",  
     "parent": "60d5f4c5c5f4b2a9d8f3e8a0"  
   }
-
+  ```
 * **Respons Sukses (201 Created)**: Mengembalikan dokumen kategori yang baru dibuat.
 
 ### **GET /kategori**
@@ -75,20 +80,22 @@ Mengelola kategori hirarkis (induk-anak).
 * **Deskripsi**: Mendapatkan daftar semua kategori.  
 * **Akses**: Publik  
 * **Respons Sukses (200 OK)**:  
-  {  
-    "kategori": \[  
-      {  
-        "\_id": "60d5f4c5c5f4b2a9d8f3e8a0",  
-        "nama\_kategori": "Sekolah Dasar",  
-        "parent": null  
-      },  
-      {  
-        "\_id": "60d5f4c5c5f4b2a9d8f3e8a2",  
-        "nama\_kategori": "Kelas 4",  
-        "parent": { "\_id": "60d5f4c5c5f4b2a9d8f3e8a0", "nama\_kategori": "Sekolah Dasar" }  
-      }  
-    \]  
+  ``` kode program
+  {
+    "kategori": [
+      {
+        "_id": "60d5f4c5c5f4b2a9d8f3e8a0",
+        "nama_kategori": "Sekolah Dasar",
+        "parent": null
+      },
+      {
+        "_id": "60d5f4c5c5f4b2a9d8f3e8a2",
+        "nama_kategori": "Kelas 4",
+        "parent": { "_id": "60d5f4c5c5f4b2a9d8f3e8a0", "nama_kategori": "Sekolah Dasar" }
+      }
+    ]
   }
+  ```
 
 ### **DELETE /kategori/:id**
 
@@ -104,34 +111,40 @@ Mengelola Karakteristik, Rekomendasi, dan Aturan.
 * **Deskripsi**: Membuat karakteristik (pertanyaan) baru dalam sebuah kategori.  
 * **Akses**: Admin  
 * **Body**:  
-  {  
-    "kodeKarakteristik": "K01",  
-    "teksPertanyaan": "Apakah subjek lebih suka belajar dengan praktik langsung?",  
-    "id\_kategori": "60d5f4c5c5f4b2a9d8f3e8a2"  
+  ``` kode program
+  {
+    "kodeKarakteristik": "K01",
+    "teksPertanyaan": "Apakah subjek lebih suka belajar dengan praktik langsung?",
+    "id_kategori": "60d5f4c5c5f4b2a9d8f3e8a2"
   }
+  ```
 
 ### **POST /rekomendasi**
 
 * **Deskripsi**: Membuat rekomendasi (hasil akhir) baru dalam sebuah kategori.  
 * **Akses**: Admin  
 * **Body**:  
-  {  
-    "kodeRekomendasi": "REC\_KINESTETIK",  
-    "namaRekomendasi": "Model Pembelajaran Kinestetik",  
-    "id\_kategori": "60d5f4c5c5f4b2a9d8f3e8a2"  
+  ``` kode program
+  {
+    "kodeRekomendasi": "REC_KINESTETIK",
+    "namaRekomendasi": "Model Pembelajaran Kinestetik",
+    "id_kategori": "60d5f4c5c5f4b2a9d8f3e8a2"
   }
+  ```
 
 ### **POST /aturan**
 
 * **Deskripsi**: Membuat aturan IF-THEN baru.  
 * **Akses**: Admin  
 * **Body**:  
-  {  
-    "kodeAturan": "AT\_KIN\_01",  
-    "if": \["ID\_KARAKTERISTIK\_1", "ID\_KARAKTERISTIK\_2"\],  
-    "then": "ID\_REKOMENDASI\_KIN",  
-    "id\_kategori": "60d5f4c5c5f4b2a9d8f3e8a2"  
+  ``` kode program
+  {
+    "kodeAturan": "AT_KIN_01",
+    "if": ["ID_KARAKTERISTIK_1", "ID_KARAKTERISTIK_2"],
+    "then": "ID_REKOMENDASI_KIN",
+    "id_kategori": "60d5f4c5c5f4b2a9d8f3e8a2"
   }
+  ```
 
 ## **4\. Modul: Subjek**
 
@@ -142,11 +155,13 @@ Mengelola entitas yang akan dianalisis.
 * **Deskripsi**: Membuat profil subjek baru dan menautkannya ke User dan Kategori.  
 * **Akses**: Terotentikasi (Admin/Guru)  
 * **Body**:  
-  {  
-    "id\_user": "ID\_USER\_BUDI",  
-    "id\_kategori": "ID\_KATEGORI\_KELAS\_4",  
-    "nama\_subjek": "Budi Setiawan"  
+  ``` kode program
+  {
+    "id_user": "ID_USER_BUDI",
+    "id_kategori": "ID_KATEGORI_KELAS_4",
+    "nama_subjek": "Budi Setiawan"
   }
+  ```
 
 ## **5\. Modul: Konsultasi**
 
@@ -157,26 +172,29 @@ Mengelola entitas yang akan dianalisis.
 * **Deskripsi**: Memproses daftar karakteristik yang dipilih oleh pengguna, menjalankan mesin inferensi, dan mengembalikan 1-3 rekomendasi teratas.  
 * **Akses**: Terotentikasi  
 * **Body**:  
-  {  
-    "id\_subjek": "ID\_SUBJEK\_BUDI",  
-    "karakteristik\_terpilih": \["ID\_KARAKTERISTIK\_1", "ID\_KARAKTERISTIK\_2", "ID\_KARAKTERISTIK\_3"\]  
+  ``` kode program
+  {
+    "id_subjek": "ID_SUBJEK_BUDI",
+    "karakteristik_terpilih": ["ID_KARAKTERISTIK_1", "ID_KARAKTERISTIK_2", "ID_KARAKTERISTIK_3"]
   }
-
+  ```
 * **Respons Sukses (200 OK)**:  
-  \[  
-    {  
-      "\_id": "ID\_REKOMENDASI\_A",  
-      "namaRekomendasi": "Model Pembelajaran Kinestetik",  
-      "deskripsi": "..."  
-    },  
-    {  
-      "\_id": "ID\_REKOMENDASI\_B",  
-      "namaRekomendasi": "Pembelajaran Berbasis Proyek",  
-      "deskripsi": "..."  
-    }  
-  \]
+  ``` kode program
+  [
+    {
+      "_id": "ID_REKOMENDASI_A",
+      "namaRekomendasi": "Model Pembelajaran Kinestetik",
+      "deskripsi": "..."
+    },
+    {
+      "_id": "ID_REKOMENDASI_B",
+      "namaRekomendasi": "Pembelajaran Berbasis Proyek",
+      "deskripsi": "..."
+    }
+  ]
+  ```
 
-### **GET /konsultasi/subjek/:id\_subjek**
+### **GET /konsultasi/subjek/:id_subjek**
 
 * **Deskripsi**: Mendapatkan riwayat semua sesi konsultasi yang pernah dilakukan oleh satu subjek.  
 * **Akses**: Terotentikasi  

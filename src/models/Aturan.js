@@ -11,23 +11,22 @@ const aturanSchema = new mongoose.Schema(
       uppercase: true,
       trim: true,
     },
-    namaAturan: {
-      type: String,
-      required: [true, "Nama/Deskripsi Aturan wajib diisi"],
-    },
-    // Bagian "IF": Kumpulan dari beberapa gejala
-    gejala: [
+    if: [
       {
         type: mongoose.Schema.Types.ObjectId,
+        ref: "Karakteristik",
         required: true,
-        ref: "Gejala", // Merujuk ke banyak dokumen di collection Gejala
       },
     ],
-    // Bagian "THEN": Satu buah solusi
-    solusi: {
+    then: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "Rekomendasi",
       required: true,
-      ref: "Solusi", // Merujuk ke satu dokumen di collection Solusi
+    },
+    id_kategori: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Kategori",
+      required: true,
     },
   },
   {
@@ -39,3 +38,4 @@ const aturanSchema = new mongoose.Schema(
 const Aturan = mongoose.models.Aturan || mongoose.model("Aturan", aturanSchema);
 
 export default Aturan;
+
