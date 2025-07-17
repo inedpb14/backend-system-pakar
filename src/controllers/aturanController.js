@@ -1,194 +1,162 @@
-// backend/src/controllers/aturanController.js
-
 import Aturan from "../models/Aturan.js";
-import { check, validationResult } from "express-validator"; // Import validation tools
+import { check, validationResult } from "express-validator";
 
-// Validation rules for Aturan
+// Async handler untuk mengurangi duplikasi try-catch
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
+// Validation rules for Aturan (tidak ada perubahan)
 const validateAturan = [
-  check("kodeAturan", "Kode Aturan wajib diisi").notEmpty(),
-  check("namaAturan", "Nama Aturan wajib diisi").notEmpty(),
-  check("gejala", "Gejala wajib diisi dan berupa array ID")
-    .isArray()
-    .notEmpty(),
-  check("solusi", "Solusi wajib diisi")
+  check("kodeAturan", "Kode Aturan wajib diisi").notEmpty().trim(),
+  check(
+    "if",
+    "Field 'if' wajib diisi dan berupa array ID Karakteristik"
+  ).isArray({ min: 1 }),
+  check(
+    "if.*",
+    "Setiap item dalam 'if' harus berupa ID yang valid"
+  ).isMongoId(),
+  check("then", "Field 'then' wajib diisi dan berupa ID Rekomendasi")
     .notEmpty()
-    .isMongoId()
-    .withMessage("ID Solusi tidak valid"),
+    .isMongoId(),
+  check("id_kategori", "ID Kategori wajib diisi dan valid")
+    .notEmpty()
+    .isMongoId(),
 ];
 
 // @desc    Membuat aturan baru
 // @route   POST /api/aturan
 // @access  Private/Admin
-const createAturan = async (req, res) => {
-  // Check validation results
+const createAturan = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { kodeAturan, namaAturan, gejala, solusi } = req.body;
-  try {
-    const aturan = await Aturan.create({
-      kodeAturan,
-      namaAturan,
-      gejala,
-      solusi,
-    });
-    res.status(201).json(aturan);
-  } catch (error) {
-    console.error("Error creating aturan:", error); // Log error
-    res
-      .status(400)
-      .json({ message: "Gagal membuat aturan", error: error.message });
+  const { kodeAturan, if: ifArr, then, id_kategori } = req.body;
+
+  // Cek duplikasi kodeAturan sebelum membuat
+  const aturanExists = await Aturan.findOne({ kodeAturan });
+  if (aturanExists) {
+    res.status(400);
+    throw new Error(`Aturan dengan kode '${kodeAturan}' sudah ada.`);
   }
-};
+
+  const aturan = await Aturan.create({
+    kodeAturan,
+    if: ifArr,
+    then,
+    id_kategori,
+  });
+  res.status(201).json(aturan);
+});
 
 // @desc    Mendapatkan semua aturan dengan pagination
 // @route   GET /api/aturan
 // @access  Public
-const getAllAturan = async (req, res) => {
-  const pageSize = parseInt(req.query.limit) || 10; // Default 10 items per page
-  const page = parseInt(req.query.page) || 1; // Default page 1
-
+const getAllAturan = asyncHandler(async (req, res) => {
+  const pageSize = parseInt(req.query.limit) || 10;
+  const page = parseInt(req.query.page) || 1;
   const skip = (page - 1) * pageSize;
 
-  try {
-    const count = await Aturan.countDocuments({}); // Get total count for pagination info
-    const aturan = await Aturan.find({})
-      .limit(pageSize) // Apply limit
-      .skip(skip) // Apply skip
-      .populate({
-        path: "gejala",
-        populate: { path: "kategori", select: "namaKategori" },
-      })
-      .populate("solusi");
+  const [aturan, count] = await Promise.all([
+    Aturan.find({})
+      .sort({ createdAt: -1 }) // Urutkan berdasarkan yang terbaru
+      .limit(pageSize)
+      .skip(skip)
+      .populate("if", "kodeKarakteristik teksPertanyaan")
+      .populate("then", "kodeRekomendasi namaRekomendasi")
+      .populate("id_kategori", "nama_kategori"),
+    Aturan.countDocuments({}),
+  ]);
 
-    res.json({
-      aturan,
-      page,
-      pages: Math.ceil(count / pageSize),
-      total: count, // Include total count
-    });
-  } catch (error) {
-    console.error("Error fetching all aturan:", error); // Log error
-    res.status(500).json({ message: "Terjadi kesalahan pada server" });
-  }
-};
+  res.json({
+    aturan,
+    page,
+    pages: Math.ceil(count / pageSize),
+    total: count,
+  });
+});
 
 // @desc    Mendapatkan aturan by ID
 // @route   GET /api/aturan/:id
 // @access  Public
-const getAturanById = async (req, res) => {
-  try {
-    const aturan = await Aturan.findById(req.params.id)
-      .populate("gejala")
-      .populate("solusi");
+const getAturanById = asyncHandler(async (req, res) => {
+  const aturan = await Aturan.findById(req.params.id)
+    .populate("if", "kodeKarakteristik teksPertanyaan")
+    .populate("then", "kodeRekomendasi namaRekomendasi")
+    .populate("id_kategori", "nama_kategori");
 
-    if (aturan) {
-      res.json(aturan);
-    } else {
-      res.status(404).json({ message: "Aturan tidak ditemukan" });
-    }
-  } catch (error) {
-    // Handle CastError for invalid ID format
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "ID Aturan tidak valid" });
-    }
-    console.error("Error fetching aturan by ID:", error); // Log other errors
-    res.status(500).json({ message: "Server Error" });
+  if (aturan) {
+    res.json(aturan);
+  } else {
+    res.status(404);
+    throw new Error("Aturan tidak ditemukan");
   }
-};
+});
 
 // @desc    Update aturan
 // @route   PUT /api/aturan/:id
 // @access  Private/Admin
-const updateAturan = async (req, res) => {
-  // Check validation results (apply validation middleware before this function)
+const updateAturan = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { kodeAturan, namaAturan, gejala, solusi } = req.body;
-  try {
-    const aturan = await Aturan.findById(req.params.id);
-    if (aturan) {
-      aturan.kodeAturan = kodeAturan ?? aturan.kodeAturan; // Use nullish coalescing
-      aturan.namaAturan = namaAturan ?? aturan.namaAturan;
-      aturan.gejala = gejala ?? aturan.gejala;
-      aturan.solusi = solusi ?? aturan.solusi;
+  // Menggunakan findByIdAndUpdate untuk efisiensi (1x operasi DB)
+  const updatedAturan = await Aturan.findByIdAndUpdate(
+    req.params.id,
+    req.body, // Mongoose akan mengambil field yang sesuai dari body
+    {
+      new: true, // Mengembalikan dokumen yang sudah di-update
+      runValidators: true,
+    }
+  );
 
-      const updatedAturan = await aturan.save();
-      res.json(updatedAturan);
-    } else {
-      res.status(404).json({ message: "Aturan tidak ditemukan" });
-    }
-  } catch (error) {
-    // Handle CastError for invalid ID format
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "ID Aturan tidak valid" });
-    }
-    console.error("Error updating aturan:", error); // Log other errors
-    res.status(400).json({ message: "Update gagal", error: error.message });
+  if (updatedAturan) {
+    res.json(updatedAturan);
+  } else {
+    res.status(404);
+    throw new Error("Aturan tidak ditemukan");
   }
-};
+});
 
 // @desc    Delete aturan
 // @route   DELETE /api/aturan/:id
 // @access  Private/Admin
-const deleteAturan = async (req, res) => {
-  try {
-    const aturan = await Aturan.findById(req.params.id);
-    if (aturan) {
-      await aturan.deleteOne();
-      res.json({ message: "Aturan berhasil dihapus" });
-    } else {
-      res.status(404).json({ message: "Aturan tidak ditemukan" });
-    }
-  } catch (error) {
-    // Handle CastError for invalid ID format
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "ID Aturan tidak valid" });
-    }
-    console.error("Error deleting aturan:", error); // Log other errors
-    res.status(500).json({ message: "Server Error" });
+const deleteAturan = asyncHandler(async (req, res) => {
+  // Menggunakan findByIdAndDelete untuk efisiensi (1x operasi DB)
+  const aturan = await Aturan.findByIdAndDelete(req.params.id);
+
+  if (aturan) {
+    res.json({ message: "Aturan berhasil dihapus" });
+  } else {
+    res.status(404);
+    throw new Error("Aturan tidak ditemukan");
   }
-};
+});
 
-// @desc    Get rules that contain a specific Gejala ID
-// @route   GET /api/aturan/bygejala/:gejalaId
-// @access  Private/Admin (or Public depending on requirement)
-const getAturanByGejalaId = async (req, res) => {
-  try {
-    const gejalaId = req.params.gejalaId;
+// @desc    Get rules that contain a specific Karakteristik ID
+// @route   GET /api/aturan/bykarakteristik/:karakteristikId
+// @access  Private/Admin
+const getAturanByKarakteristikId = asyncHandler(async (req, res) => {
+  const { karakteristikId } = req.params;
 
-    // Validate if gejalaId is a valid MongoId
-    if (!gejalaId.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ message: "ID Gejala tidak valid" });
-    }
+  const aturan = await Aturan.find({ if: karakteristikId })
+    .populate("if", "kodeKarakteristik teksPertanyaan")
+    .populate("then", "kodeRekomendasi namaRekomendasi")
+    .populate("id_kategori", "nama_kategori");
 
-    // Find rules where the gejala array contains the given gejalaId
-    const aturan = await Aturan.find({ gejala: gejalaId })
-      .populate({
-        path: "gejala",
-        populate: { path: "kategori", select: "namaKategori" },
-      })
-      .populate("solusi");
+  res.json(aturan); // Akan mengembalikan array kosong jika tidak ditemukan, ini perilaku yg benar
+});
 
-    res.json(aturan);
-  } catch (error) {
-    console.error("Error fetching aturan by gejala ID:", error);
-    res.status(500).json({ message: "Terjadi kesalahan pada server" });
-  }
-};
-
-// --- PASTIKAN SEMUA FUNGSI DIEKSPOR DI SINI ---
 export {
   createAturan,
   getAllAturan,
   getAturanById,
   updateAturan,
   deleteAturan,
-  getAturanByGejalaId, // Export the new function
-  validateAturan, // Export validation rules to be used in routes
+  getAturanByKarakteristikId,
+  validateAturan,
 };

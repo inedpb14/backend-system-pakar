@@ -1,222 +1,186 @@
 // backend/src/controllers/userController.js
 
-import User from "../models/user.js";
-import RiwayatKonsultasi from "../models/RiwayatKonsultasi.js"; // Import RiwayatKonsultasi model
-import { check, validationResult } from "express-validator"; // Untuk validasi input
-import generateToken from "../utils/generateToken.js"; // <-- perhatikan .js
+import User from "../models/User.js";
+import Subjek from "../models/Subjek.js"; // Diperlukan untuk proses delete
+import { check, validationResult } from "express-validator";
+import generateToken from "../utils/generateToken.js";
 
-// Validation rules for User login
-const validateLogin = [
-  check('username', 'Username wajib diisi').notEmpty(),
-  check('password', 'Password wajib diisi').notEmpty(),
+// Wrapper untuk menangani error pada fungsi async
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
+// Aturan validasi
+export const validateLogin = [
+  check("email", "Email wajib diisi dan valid").isEmail(),
+  check("password", "Password wajib diisi").notEmpty(),
 ];
 
-// Validation rules for User registration
-const validateRegister = [
-  check('username', 'Username wajib diisi').notEmpty(),
-  check('password', 'Password wajib diisi dan minimal 6 karakter').isLength({ min: 6 }),
-  check('role', 'Role wajib diisi').notEmpty().isIn(['admin', 'siswa']).withMessage('Role harus "admin" atau "siswa"'),
-  // Validate kelasId only if role is 'siswa'
-  check('kelas').optional().isMongoId().withMessage('ID Kelas tidak valid'),
+export const validateRegister = [
+  check("namaLengkap", "Nama Lengkap wajib diisi").notEmpty().trim(),
+  check("email", "Email wajib diisi dan valid").isEmail(),
+  check("password", "Password minimal 6 karakter").isLength({ min: 6 }),
+  check("role", "Role wajib diisi")
+    .notEmpty()
+    .isIn(["admin", "guru", "pengguna"]),
 ];
 
-// Validation rules for User update
-const validateUpdateUser = [
-  check('username', 'Username tidak boleh kosong').optional().notEmpty(),
-  check('role', 'Role tidak valid').optional().isIn(['admin', 'siswa']).withMessage('Role harus "admin" atau "siswa"'),
-  check('kelasId', 'ID Kelas tidak valid').optional().isMongoId().withMessage('ID Kelas tidak valid'),
-  check('password', 'Password minimal 6 karakter').optional().isLength({ min: 6 }),
+export const validateUpdateUser = [
+  check("namaLengkap", "Nama Lengkap tidak boleh kosong")
+    .optional()
+    .notEmpty()
+    .trim(),
+  check("email", "Format email tidak valid").optional().isEmail(),
+  check("role", "Role tidak valid")
+    .optional()
+    .isIn(["admin", "guru", "pengguna"]),
 ];
 
 // @desc    Login user & get token
-// @route   POST /api/users/login
-// @access  Public
-const loginUser = async (req, res) => {
-  // Check validation results
+export const loginUser = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { username, password } = req.body;
-  try {
-    const user = await User.findOne({ username });
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        _id: user._id,
-        username: user.username,
-        role: user.role,
-        kelas: user.kelas, // Kirim info kelas saat login
-        token: generateToken(res, user._id),
-      });
-    } else {
-      res.status(401).json({ message: 'Username atau password salah' });
-    }
-  } catch (error) {
-    console.error("Error during login:", error); // Log error
-    res.status(500).json({ message: error.message || 'Server Error' });
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+
+  if (user && (await user.matchPassword(password))) {
+    generateToken(res, user._id);
+    res.json({
+      _id: user._id,
+      namaLengkap: user.namaLengkap,
+      email: user.email,
+      role: user.role,
+    });
+  } else {
+    res.status(401);
+    throw new Error("Email atau password salah");
   }
-};
+});
 
 // @desc    Register a new user
-// @route   POST /api/users/register
-// @access  Public (atau bisa diubah ke Private/Admin jika hanya admin yang boleh mendaftar)
-const registerUser = async (req, res) => {
-  // Periksa hasil validasi
+export const registerUser = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
-  const { username, password, role, kelas } = req.body; // 'kelas' here is the ID
 
-  try {
-    const userExists = await User.findOne({ username });
-    if (userExists) {
-      return res.status(400).json({ message: "Username sudah terdaftar" });
-    }
-    const user = await User.create({ username, password, role, kelas });
+  const { namaLengkap, email, password, role } = req.body;
+  const userExists = await User.findOne({ email });
+
+  if (userExists) {
+    res.status(400);
+    throw new Error("User dengan email tersebut sudah terdaftar");
+  }
+
+  const user = await User.create({ namaLengkap, email, password, role });
+
+  if (user) {
+    generateToken(res, user._id);
     res.status(201).json({
       _id: user._id,
-      username: user.username,
+      namaLengkap: user.namaLengkap,
+      email: user.email,
       role: user.role,
-      kelas: user.kelas,
-      token: generateToken(res, user._id),
     });
-  } catch (error) {
-    console.error("Error during registration:", error); // Log error
-    res
-      .status(400)
-      .json({ message: "Data pengguna tidak valid", error: error.message });
+  } else {
+    res.status(400);
+    throw new Error("Data pengguna tidak valid");
   }
-};
+});
 
-// @desc    Get all users with role 'siswa' with pagination
-// @route   GET /api/users/siswa
+// @desc    Get all users (for admin)
+// @route   GET /api/users
 // @access  Private/Admin
-const getAllSiswa = async (req, res) => {
-  const pageSize = parseInt(req.query.limit) || 10; // Default 10 items per page
-  const page = parseInt(req.query.page) || 1; // Default page 1
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const pageSize = parseInt(req.query.limit) || 10;
+  const page = parseInt(req.query.page) || 1;
 
-  const skip = (page - 1) * pageSize;
+  const [users, count] = await Promise.all([
+    User.find({})
+      .limit(pageSize)
+      .skip((page - 1) * pageSize)
+      .select("-password")
+      .sort({ createdAt: -1 }),
+    User.countDocuments({}),
+  ]);
 
-  try {
-    const count = await User.countDocuments({ role: 'siswa' }); // Count only siswa
-    const siswa = await User.find({ role: 'siswa' })
-      .limit(pageSize) // Apply limit
-      .skip(skip) // Apply skip
-      .populate('kelas', 'namaKelas')
-      .select('-password');
-    
-    res.json({
-      siswa,
-      page,
-      pages: Math.ceil(count / pageSize),
-      total: count // Include total count
-    });
-  } catch (error) {
-    console.error("Error fetching all siswa:", error); // Log error
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
+  res.json({
+    users,
+    page,
+    pages: Math.ceil(count / pageSize),
+    total: count,
+  });
+});
 
-// @desc    Get user by ID
+// @desc    Get user by ID (for admin)
 // @route   GET /api/users/:id
 // @access  Private/Admin
-const getUserById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).populate('kelas', 'namaKelas').select('-password');
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: 'User tidak ditemukan' });
-    }
-  } catch (error) {
-    // Handle CastError for invalid ID format
-    if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'ID User tidak valid' });
-    }
-    console.error("Error fetching user by ID:", error); // Log other errors
-    res.status(500).json({ message: 'Server Error' });
+export const getUserById = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id).select("-password");
+  if (user) {
+    res.json(user);
+  } else {
+    res.status(404);
+    throw new Error("User tidak ditemukan");
   }
-};
+});
 
-// @desc    Update user (termasuk kelas)
+// @desc    Update user (for admin)
 // @route   PUT /api/users/:id
 // @access  Private/Admin
-const updateUser = async (req, res) => {
-  // Check validation results (apply validation middleware before this function)
+export const updateUser = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      user.username = req.body.username ?? user.username; // Use nullish coalescing
-      user.role = req.body.role ?? user.role;
-      user.kelas = req.body.kelasId ?? user.kelas; // Terima kelasId dari form frontend
+  const user = await User.findById(req.params.id);
 
-      // Jika password dikirim, update juga passwordnya
-      if (req.body.password) {
-        user.password = req.body.password;
-      }
+  if (user) {
+    user.namaLengkap = req.body.namaLengkap || user.namaLengkap;
+    user.email = req.body.email || user.email;
+    user.role = req.body.role || user.role;
 
-      const updatedUser = await user.save();
-      res.json({
-        _id: updatedUser._id,
-        username: updatedUser.username,
-        role: updatedUser.role,
-        kelas: updatedUser.kelas,
-      });
-    } else {
-      res.status(404).json({ message: 'User tidak ditemukan' });
+    // Jika ada password baru, middleware pre-save akan otomatis meng-hashnya
+    if (req.body.password) {
+      user.password = req.body.password;
     }
-  } catch (error) {
-    // Handle CastError for invalid ID format
-    if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'ID User tidak valid' });
-    }
-    console.error("Error updating user:", error); // Log other errors
-    res.status(400).json({ message: 'Update gagal', error: error.message });
+
+    const updatedUser = await user.save();
+
+    res.json({
+      _id: updatedUser._id,
+      namaLengkap: updatedUser.namaLengkap,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    });
+  } else {
+    res.status(404);
+    throw new Error("User tidak ditemukan");
   }
-};
+});
 
-// @desc    Delete user (and associated data)
+// @desc    Delete user
 // @route   DELETE /api/users/:id
 // @access  Private/Admin
-const deleteUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      // Hapus riwayat konsultasi yang terkait dengan pengguna ini
-      await RiwayatKonsultasi.deleteMany({ siswa: user._id });
-      
-      // Hapus pengguna secara permanen
-      await user.deleteOne();
-      res.json({ message: 'User dan riwayat terkait berhasil dihapus' });
-    } else {
-      res.status(404).json({ message: 'User tidak ditemukan' });
+export const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+
+  if (user) {
+    if (user.role === "admin") {
+      res.status(400);
+      throw new Error("Tidak dapat menghapus pengguna admin.");
     }
-  } catch (error) {
-    // Handle CastError for invalid ID format
-    if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'ID User tidak valid' });
-    }
-    console.error("Error deleting user:", error); // Log other errors
-    res.status(500).json({ message: 'Server Error' });
+
+    // Hapus juga Subjek yang terkait dengan User ini
+    await Subjek.deleteMany({ id_user: user._id });
+
+    await user.deleteOne();
+    res.json({ message: "User dan data subjek terkait berhasil dihapus." });
+  } else {
+    res.status(404);
+    throw new Error("User tidak ditemukan");
   }
-};
-
-
-export {
-  loginUser,
-  registerUser,
-  getAllSiswa,
-  getUserById,
-  updateUser,
-  deleteUser,
-  validateLogin, // Export validation rules
-  validateRegister, // Export validation rules
-  validateUpdateUser // Export validation rules
-};
+});

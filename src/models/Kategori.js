@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
 const kategoriSchema = new mongoose.Schema(
   {
-    namaKategori: { type: String, required: true, unique: true, trim: true },
+    nama_kategori: { type: String, required: true },
     deskripsi: { type: String },
-  },
-  { timestamps: true }
+    parent: { type: mongoose.Schema.Types.ObjectId, ref: "Kategori", default: null },
+  }
 );
 
 const Kategori = mongoose.models.Kategori || mongoose.model("Kategori", kategoriSchema);

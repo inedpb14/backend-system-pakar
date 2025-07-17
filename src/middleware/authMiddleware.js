@@ -1,10 +1,9 @@
 // backend/src/middleware/authMiddleware.js
 
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import User from "../models/user.js";
 
 const protect = async (req, res, next) => {
-  
   let token;
 
   // 1. Cek apakah header 'Authorization' ada dan diawali dengan 'Bearer'
@@ -20,18 +19,28 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // 4. Dapatkan data user dari ID di dalam token dan tempelkan ke object request
-      req.user = await User.findById(decoded.userId).select("-password");
+      const user = await User.findById(decoded.userId).select("-password");
+
+      if (!user) {
+        return res.status(401).json({ message: "User tidak ditemukan" });
+      }
+
+      // Pastikan user memiliki status aktif (jika ada field status)
+      if (user.status && user.status !== "aktif") {
+        return res.status(403).json({ message: "Akun Anda tidak aktif" });
+      }
+
+      // Tempelkan user ke req
+      req.user = user;
 
       // Lanjutkan ke proses selanjutnya (controller)
       next();
     } catch (error) {
-      console.error("Token verification failed:", error);
+      console.error("Token verification failed:", error.message);
       res.status(401).json({ message: "Tidak terotorisasi, token gagal" });
     }
-  }
-
-  // Jika tidak ada token sama sekali di header
-  if (!token) {
+  } else {
+    // Jika tidak ada token sama sekali di header
     res.status(401).json({ message: "Tidak terotorisasi, tidak ada token" });
   }
 };

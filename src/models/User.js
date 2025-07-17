@@ -5,51 +5,47 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    username: {
+    namaLengkap: {
       type: String,
-      required: [true, "Username tidak boleh kosong"],
+      required: true,
+    },
+    email: {
+      type: String,
+      required: true,
       unique: true,
-      trim: true,
-      lowercase: true,
+      lowercase: true, // PENYEMPURNAAN: Otomatis mengubah email ke huruf kecil
+      trim: true, // PENYEMPURNAAN: Otomatis menghapus spasi di awal/akhir
     },
     password: {
       type: String,
-      required: [true, "Password tidak boleh kosong"],
+      required: true,
     },
     role: {
       type: String,
-      required: true,
-      enum: ["admin", "guru", "siswa"],
-      default: "siswa",
-    },
-    kelas: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Kelas",
-      default: null,
+      required: true, // Diubah dari default menjadi required
+      enum: ["admin", "guru", "pengguna"], // Tambahkan 'siswa' ke enum
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Ini merupakan metode untuk membandingkan password
-// Metode ini akan tersedia di setiap dokumen User (user.matchPassword)
+// Metode untuk membandingkan password yang diinput dengan password di database
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Middleware 'pre-save' untuk hash password sebelum disimpan
-// Ini akan berjalan secara otomatis setiap kali dokumen User baru dibuat atau passwordnya diubah
+// Middleware 'pre-save' untuk hash password sebelum dokumen disimpan
 userSchema.pre("save", async function (next) {
-  // Hanya hash password jika field password dimodifikasi
+  // Hanya hash password jika field 'password' dimodifikasi (atau saat user baru)
   if (!this.isModified("password")) {
-    next();
+    return next();
   }
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
+
 export default User;

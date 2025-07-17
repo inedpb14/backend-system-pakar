@@ -1,57 +1,61 @@
 // backend/src/index.js
 
 import express from "express";
+import dotenv from "dotenv";
+import morgan from "morgan";
+import cookieParser from "cookie-parser"; // Tambahan: berguna untuk JWT di cookies
 import connectDB from "./config/db.js";
-import cors from "cors";
-import helmet from "helmet";
 
-// rotes api
-import userRoutes from "./routes/userRoutes.js";
+// Impor Rute yang Benar
 import kategoriRoutes from "./routes/kategoriRoutes.js";
-import gejalaRoutes from "./routes/gejalaRoutes.js"; 
-import solusiRoutes from "./routes/solusiRoutes.js"; 
-import aturanRoutes from "./routes/aturanRoutes.js"; 
+import userRoutes from "./routes/userRoutes.js";
+import karakteristikRoutes from "./routes/karakteristikRoutes.js";
+import rekomendasiRoutes from "./routes/rekomendasiRoutes.js"; // BARU
+import aturanRoutes from "./routes/aturanRoutes.js";
 import konsultasiRoutes from "./routes/konsultasiRoutes.js";
-import kelasRoutes from "./routes/kelasRoutes.js"; 
+import subjekRoutes from "./routes/subjectRoutes.js"; // BARU
 
+// Impor Middleware Error
+import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
-const PORT = process.env.PORT || 5001; 
+dotenv.config();
 
-const app = express();
-app.use(helmet()); // Menambahkan helmet untuk keamanan
-
-// Panggil fungsi koneksi database
+// Koneksi ke database
 connectDB();
 
-// Middleware
-app.use(cors());
-// // Konfigurasi CORS
-// const corsOptions = {
-//   origin: 'https://URL_FRONTEND_ANDA.vercel.app', // Ganti dengan URL Vercel frontend Anda nanti
-//   optionsSuccessStatus: 200
-// };
-// app.use(cors(corsOptions));
+const app = express();
 
+// Middleware untuk logging (hanya aktif di mode development)
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
+
+// Middleware untuk parsing body JSON dan cookies
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-// Routes
-app.get("/", (req, res) => {
-  res.send(
-    "<h1>Server Back-end Sistem Pakar (ESM)</h1><p>Status: Berjalan</p>"
-  );
-});
-
-app.use("/api/users", userRoutes);
-app.use("/api/kategori", kategoriRoutes); 
-app.use("/api/gejala", gejalaRoutes);
-app.use("/api/solusi", solusiRoutes);
+// ===============================================
+// Pemasangan Rute API (Routes Mounting)
+// ===============================================
+app.use("/api/kategori", kategoriRoutes);
+app.use("/api/karakteristik", karakteristikRoutes);
+app.use("/api/rekomendasi", rekomendasiRoutes);
 app.use("/api/aturan", aturanRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/subjek", subjekRoutes);
 app.use("/api/konsultasi", konsultasiRoutes);
-app.use("/api/kelas", kelasRoutes);
 
-// Start Server
+// Middleware untuk Error Handling (ditempatkan di akhir)
+app.use(notFound);
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
+  console.log(
+    `Server berjalan di mode ${process.env.NODE_ENV} pada port ${PORT}`
+  );
 });
 
 export default app;
